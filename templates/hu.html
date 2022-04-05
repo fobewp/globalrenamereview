@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="hu">
+  <head>
+    <meta charset="utf-8">
+    <title>Ellenőrzésre váró globális fájlátnevezések</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <h1>Ellenőrzésre váró globális fájlátnevezések</h1>
+    <p>Ez a lap az <a href="https://hu.wikipedia.org/wiki/Speci%C3%A1lis:Vand%C3%A1lsz%C5%B1r%C5%91/64">ellenőrzésre váró globális fájlátnevezéseket</a> listázza. Jelenleg {{ count }} ilyen lap vár ellenőrzésre.</p>
+    <table id="globalrename">
+      <tr>
+        <th>Cikk</th>
+        <th>Szerkesztő(k)</th>
+        <th>Ellenőrzés</th>
+      </tr>
+      {% for row in rows %}
+      <tr>
+        <td><a href="{{ row.url }}" lang="{{ lang }}" hreflang="{{ lang }}">{{ row.title }}</a></td>
+        <td><bdi lang="">{{ row.renamer }}</bdi> {% if row.others %} + {{ row.others }} további {% endif %}</td>
+        <td class="tell"><a href="{{ row.reviewurl }}" hreflang="{{ lang }}">ellenőriz</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <footer>
+      <p><a href="https://github.com/fobewp/globalrenamereview/tree/main">Forráskód</a></p>
+      <nav>
+        Wikik:
+        <ul>
+          {% for dbname in dbnames %}
+          <li><a href="/{{ dbname }}" lang="zxx">{{ dbname }}</a></li>
+          {% endfor %}
+        </ul>
+      </nav>
+    </footer>
+  </body>
+</html>

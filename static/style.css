@@ -1,0 +1,39 @@
+body {
+  font-family: sans-serif;
+}
+table {
+  background-color: #f8f9fa;
+  color: #202122;
+  margin: 1em 0;
+  border: 1px solid #a2a9b1;
+  border-collapse: collapse;
+}
+th,
+td {
+  border: 1px solid #a2a9b1;
+  padding: 0.2em 0.4em;
+  color: #202122;
+  border-collapse: collapse;
+}
+th {
+  background-color: #eaecf0;
+  text-align: center;
+}
+a {
+  text-decoration: none;
+  color: #0645ad;
+  background: none;
+}
+.tell {
+  text-align: center;
+}
+nav ul,
+nav li {
+	display: inline;
+	margin: 0;
+	padding: 0;
+}
+nav li:not(:last-child)::after {
+	content: " ·";
+	font-weight: bold;
+}

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Unreviewed global file renames</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <h1>Unreviewed global file renames</h1>
+    <p>This page lists global file renames that are <a href="https://www.mediawiki.org/wiki/Help:Extension:FlaggedRevs">pending review</a>. There {% if count == 1 %} is currently one page {% else %} are currently {{ count }} pages {% endif %} in this backlog.</p>
+    <table id="globalrename">
+      <tr>
+        <th>Article</th>
+        <th>Editor(s)</th>
+        <th>Review</th>
+      </tr>
+      {% for row in rows %}
+      <tr>
+        <td><a href="{{ row.url }}" lang="{{ lang }}" hreflang="{{ lang }}">{{ row.title }}</a></td>
+        <td><bdi lang="">{{ row.renamer }}</bdi> {% if row.others %} + {{ row.others }} others {% endif %}</td>
+        <td class="tell"><a href="{{ row.reviewurl }}" hreflang="{{ lang }}">review</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <footer>
+      <p><a href="https://github.com/fobewp/globalrenamereview/tree/main">Source code</a></p>
+      <nav>
+        Wikis:
+        <ul>
+          {% for dbname in dbnames %}
+          <li><a href="/{{ dbname }}" lang="zxx">{{ dbname }}</a></li>
+          {% endfor %}
+        </ul>
+      </nav>
+    </footer>
+  </body>
+</html>

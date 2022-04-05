@@ -14,36 +14,83 @@
 # with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import flask
+import re
+import requests
 import toolforge
+import urllib.parse
+
+def getrequest(url: str, **kwargs):
+  r = requests.get(url, params=kwargs)
+  r.raise_for_status()
+  return r
+
+def getdbs() -> dict:
+  toolforge.set_user_agent('globalrenamereview')
+  dblist = getrequest('https://noc.wikimedia.org/conf/dblists/flaggedrevs.dblist').text
+  dbnames = [db for db in [re.sub('#.*$', '', line).strip() for line in dblist.splitlines()] if db != '']
+  sitematrix = getrequest('https://meta.wikimedia.org/w/api.php', action='sitematrix', format='json').json()['sitematrix']
+  dbs = {}
+  for dbname in dbnames:
+    for num in sitematrix:
+      if num.isdigit():
+        for site in sitematrix[num]['site']:
+          if site['dbname'] == dbname:
+            dbs[dbname] = {'url': site['url'], 'langcode': sitematrix[num]['code']}
+      elif num == 'specials':
+        for special in sitematrix[num]:
+          if special['dbname'] == dbname:
+            dbs[dbname] = {'url': special['url'], 'langcode': 'en'}
+  return dbs
+
+fr_dbs = getdbs()
+supported_languages = ['en', 'de', 'hu']
+query = r'''
+SELECT
+	page1.page_title,
+	actor1.actor_name AS renamer,
+	COUNT(DISTINCT actor2.actor_name) AS pending_users,
+	flaggedpage_pending1.fpp_rev_id AS pending_oldid
+FROM
+	page as page1
+	INNER JOIN revision AS revision1 ON page1.page_id = revision1.rev_page
+	INNER JOIN flaggedpage_pending AS flaggedpage_pending1 ON page1.page_id = flaggedpage_pending1.fpp_page_id
+	INNER JOIN actor AS actor1 ON actor1.actor_id = revision1.rev_actor
+	INNER JOIN `comment` AS comment1 ON comment1.comment_id = revision1.rev_comment_id
+	INNER JOIN revision AS revision2 ON page1.page_id = revision2.rev_page
+	INNER JOIN actor AS actor2 ON actor2.actor_id = revision2.rev_actor
+WHERE
+	revision1.rev_timestamp >= flaggedpage_pending1.fpp_pending_since
+	AND (comment1.comment_text RLIKE '^\\(\\[\\[c\\:GR\\|GR\\]\\]\\)' OR comment1.comment_text RLIKE '[G|g]lobal[R|r]eplace')
+	AND revision2.rev_timestamp >= flaggedpage_pending1.fpp_pending_since
+	AND page1.page_namespace = 0
+GROUP BY
+	page1.page_title
+ORDER BY
+	revision1.rev_timestamp DESC;
+'''
 
 app = flask.Flask(__name__)
 
 @app.route('/')
-def index():
-  style   = 'body { font-family: sans-serif; }'
-  style  += 'table { background-color: #f8f9fa; color: #202122; margin: 1em 0; border: 1px solid #a2a9b1; border-collapse: collapse; }\n'
-  style  += 'th { background-color: #eaecf0; text-align: center;  border: 1px solid #a2a9b1; padding: 0.2em 0.4em; color: #202122; border-collapse: collapse; }\n'
-  style  += 'td { border: 1px solid #a2a9b1; padding: 0.2em 0.4em; color: #202122; border-collapse: collapse; }\n'
-  style  += 'a { text-decoration: none; color: #0645ad; background: none; }\n'
-  style  += '.tell{ text-align: center; }\n'
-
-  output = '<style>'+style+'</style>\n<body>\n'
-  conn = toolforge.connect('huwiki','analytics') # conn is a pymysql.connection object.
-  query = "SELECT page1.page_title AS 'Cím',CONCAT(af.afl_user_text, IF(COUNT(DISTINCT actor.actor_name)>1, CONCAT(' + ', COUNT(DISTINCT actor.actor_name)-1,' további'), '') ) AS 'Szerkesztő', CONCAT('https://hu.wikipedia.org/w/index.php?title=',page1.page_title,'&oldid=',flaggedpage_pending1.fpp_rev_id,'&diff=',page1.page_latest) AS 'Ellenőriz' FROM page as page1 INNER JOIN revision AS revision1 ON page1.page_id = revision1.rev_page INNER JOIN flaggedpage_pending AS flaggedpage_pending1 ON page1.page_id = flaggedpage_pending1.fpp_page_id INNER JOIN abuse_filter_log AS af ON af.afl_rev_id = revision1.rev_id INNER JOIN revision AS revision2 ON page1.page_id = revision2.rev_page INNER JOIN actor ON actor.actor_id = revision2.rev_actor WHERE revision1.rev_timestamp >= flaggedpage_pending1.fpp_pending_since AND af.afl_filter_id = 64 AND revision2.rev_timestamp >= flaggedpage_pending1.fpp_pending_since AND page1.page_namespace = 0 GROUP BY page1.page_title ORDER BY revision1.rev_timestamp DESC;"
+@app.route('/<dbname>')
+def index(dbname='huwiki'):
+  if dbname not in fr_dbs:
+    flask.abort(404)
+  conn = toolforge.connect(dbname, 'analytics') # conn is a pymysql.connection object.
+  domain, targetlang = fr_dbs[dbname]['url'], fr_dbs[dbname]['langcode']
+  rows = []
   with conn.cursor() as cur: # querying articles
-    rows = cur.execute(query) # number of affected rows
-    output += '<p>Ez a lap az <a href="https://hu.wikipedia.org/wiki/Speci%C3%A1lis:Vand%C3%A1lsz%C5%B1r%C5%91/64">ellenőrzésre váró globális fájlátnevezéseket</a> listázza. Jelenleg '+str(rows)+' ilyen lap vár ellenőrzésre.</p>\n'
-    output += '<table id="globalrename">\n'
-    output += '<tr><th>Cikk</th><th>Szerkesztő(k)</th><th>Ellenőrzés</th></tr>'
-    for i in range(rows):
+    rowcount = cur.execute(query) # number of affected rows
+    for i in range(rowcount):
       row = cur.fetchone()
-      output += '<tr>'
-      output += '<td><a href="https://hu.wikipedia.org/wiki/'+row[0].decode('utf-8')+'">'+row[0].decode('utf-8').replace("_"," ")+'</a></td>'
-      output += '<td>'+row[1].decode('utf-8')+'</td>'
-      output += '<td class="tell"><a href="'+row[2].decode('utf-8')+'">ellenőriz</a></td>'
-      output += '</tr>\n'
-    output += '</table>\n'
-    output += '<p><a href="https://github.com/fobewp/globalrenamereview/tree/main">Forráskód</a></p>\n'
-    output += '</body>'
+      urltitle = urllib.parse.quote(row[0].decode('utf-8'))
+      rows.append({
+        'url': '%s/wiki/%s' % (domain, urltitle),
+        'title': row[0].decode('utf-8').replace('_', ' '),
+        'renamer': row[1].decode('utf-8'),
+        'others': row[2] - 1,
+        'reviewurl': '%s/w/index.php?title=%s&oldid=%d&diff=curr' % (domain, urltitle, row[3])
+      })
   conn.close()
-  return output
+  lang = flask.request.accept_languages.best_match(supported_languages)
+  return flask.render_template(lang + '.html', lang=targetlang, count=rowcount, rows=rows, dbnames=fr_dbs.keys())
