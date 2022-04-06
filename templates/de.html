@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <title>Ungesichtete globale Umbenennungen</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <h1>Ungesichtete globale Umbenennungen</h1>
+    <p>Diese Seite zählt globale Dateiumbenennungen, die noch nicht <a href="https://de.wikipedia.org/wiki/Hilfe:Gesichtete_Versionen">gesichtet wurden</a>, auf. Im Moment gibt es {% if count == 1 %} eine Seite {% else %} {{ count }} Seiten {% endif %} auf dieser Liste.</p>
+    <table id="globalrename">
+      <tr>
+        <th>Artikel</th>
+        <th>Bearbeiter</th>
+        <th>Sichten</th>
+      </tr>
+      {% for row in rows %}
+      <tr>
+        <td><a href="{{ row.url }}" lang="{{ lang }}" hreflang="{{ lang }}">{{ row.title }}</a></td>
+        <td><bdi lang="">{{ row.renamer }}</bdi> {% if row.others %} + {{ row.others }} anderen {% endif %}</td>
+        <td class="tell"><a href="{{ row.reviewurl }}" hreflang="{{ lang }}">sichten</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <footer>
+      <p><a href="https://github.com/fobewp/globalrenamereview/tree/main">Quellcode</a></p>
+      <nav>
+        Wikis:
+        <ul>
+          {% for dbname in dbnames %}
+          <li><a href="/{{ dbname }}" lang="zxx">{{ dbname }}</a></li>
+          {% endfor %}
+        </ul>
+      </nav>
+    </footer>
+  </body>
+</html>
